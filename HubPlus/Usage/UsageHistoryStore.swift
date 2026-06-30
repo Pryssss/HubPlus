@@ -28,7 +28,7 @@ final class UsageHistoryStore {
         samples.removeAll { $0.t < cutoff }
         let snapshot = samples
         io.async { [fileURL] in
-            if let data = try? JSONEncoder().encode(snapshot) { try? data.write(to: fileURL) }
+            if let data = try? JSONEncoder().encode(snapshot) { try? data.write(to: fileURL, options: .atomic) }
         }
     }
 
