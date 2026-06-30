@@ -41,3 +41,21 @@ targets:
         ENABLE_PREVIEWS: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: HubPlus/Resources/HubPlus.entitlements
+  HubPlusTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [HubPlusTests]
+    dependencies:
+      - target: HubPlus
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+
+schemes:
+  HubPlus:
+    build:
+      targets:
+        HubPlus: all
+    test:
+      targets: [HubPlusTests]
