@@ -32,6 +32,7 @@ final class NotchController {
     private var expandWork: DispatchWorkItem?
     private var collapseWork: DispatchWorkItem?
     private var clickMonitor: Any?
+    private var tabCancellable: AnyCancellable?
 
     private var isVerticalEdge: Bool { edge == .left || edge == .right }
     private var collapsedSize: NSSize {
@@ -47,6 +48,10 @@ final class NotchController {
         }
         if let e = d.string(forKey: "pillEdge"), let parsed = Edge(rawValue: e) { edge = parsed }
         ui.vertical = isVerticalEdge
+        tabCancellable = ui.$tab.sink { [weak self] tab in
+            guard tab == .stats else { return }
+            MainActor.assumeIsolated { self?.store.refreshStats(force: true) }
+        }
     }
 
     func show() {

@@ -10,7 +10,11 @@ final class AppStore: ObservableObject {
     @Published private(set) var usage: UsageSnapshot?
     @Published private(set) var burn5h: BurnProjection?
     @Published private(set) var burn7d: BurnProjection?
+    @Published private(set) var projectUsage: [ProjectUsage] = []
+    @Published private(set) var partialProjects = false
+    @Published private(set) var dailyTokens: [(date: Date, tokens: Int)] = []
     let history = UsageHistoryStore(fileURL: UsageHistoryStore.defaultURL())
+    private var lastStats = Date.distantPast
 
     private var timer: Timer?
     private var usageTimer: Timer?
@@ -144,6 +148,20 @@ final class AppStore: ObservableObject {
 
     func fiveSeries() -> [(t: Double, util: Double)] { history.fiveSeries() }
     func sevenSeries() -> [(t: Double, util: Double)] { history.sevenSeries() }
+
+    func refreshStats(force: Bool = false) {
+        if !force, Date().timeIntervalSince(lastStats) < 30 { return }
+        lastStats = Date()
+        work.async { [weak self] in
+            let daily = StatsCache.dailyTokens(days: 7)
+            let (projects, partial) = ProjectUsageProbe.compute(now: Date())
+            DispatchQueue.main.async {
+                self?.dailyTokens = daily
+                self?.projectUsage = projects
+                self?.partialProjects = partial
+            }
+        }
+    }
 
     /// Notify when an agent newly finishes (busy/waiting → idle) or newly needs
     /// the user (→ waiting). Baseline is set silently on first sight of a session.
