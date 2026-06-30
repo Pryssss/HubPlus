@@ -7,6 +7,10 @@ final class WindowJumperTests: XCTestCase {
         XCTAssertEqual(WindowJumper.parseTTY("  ttys012 "), "/dev/ttys012")
         XCTAssertNil(WindowJumper.parseTTY("??\n"))
         XCTAssertNil(WindowJumper.parseTTY(""))
+        // Injection guard: non-alphanumeric/slash characters must be rejected.
+        XCTAssertNil(WindowJumper.parseTTY("ttys003\"; tell application"))
+        XCTAssertNil(WindowJumper.parseTTY("/dev/ttys003; rm -rf /"))
+        XCTAssertNil(WindowJumper.parseTTY("ttys003\n\"; evil"))
     }
     func testTerminalKind() {
         if case .terminalApp? = WindowJumper.terminalKind(comm: "Terminal") {} else { XCTFail() }

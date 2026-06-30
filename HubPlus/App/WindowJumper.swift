@@ -6,6 +6,7 @@ enum WindowJumper {
     static func parseTTY(_ psOutput: String) -> String? {
         let t = psOutput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty, t != "??", t != "?" else { return nil }
+        guard t.range(of: "^[a-zA-Z0-9/]+$", options: .regularExpression) != nil else { return nil }
         return t.hasPrefix("/dev/") ? t : "/dev/\(t)"
     }
 
@@ -40,7 +41,7 @@ enum WindowJumper {
             let parts = line.split(separator: " ", maxSplits: 1).map(String.init)
             guard parts.count == 2, let ppid = Int32(parts[0]) else { return nil }
             let comm = (parts[1] as NSString).lastPathComponent
-            if let kind = terminalKind(comm: comm) { return (cur == pid ? ppid : cur, kind) }
+            if let kind = terminalKind(comm: comm) { return (cur, kind) }
             if ppid <= 1 { return nil }
             cur = ppid
         }
