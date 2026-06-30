@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Expanded state: header · usage · session cards. Background/shape come from the
+/// Expanded state: header · tab switcher · content. Background/shape come from the
 /// container, so this just lays out content and fills the width.
 struct NotchRootView: View {
     @ObservedObject var store: AppStore
+    @ObservedObject var ui: NotchUIModel
     var onClose: () -> Void = {}
 
     var body: some View {
@@ -12,7 +13,8 @@ struct NotchRootView: View {
             divider
             UsageHeaderView(usage: store.usage, burn5h: store.burn5h, burn7d: store.burn7d)
             divider
-            content
+            tabSwitcher
+            tabContent
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -41,7 +43,30 @@ struct NotchRootView: View {
         .padding(.bottom, 7)
     }
 
-    @ViewBuilder private var content: some View {
+    private var tabSwitcher: some View {
+        HStack {
+            Picker("", selection: $ui.tab) {
+                Text("Agents").tag(NotchTab.agents)
+                Text("Stats").tag(NotchTab.stats)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 180)
+            Spacer()
+        }
+        .padding(.vertical, 6)
+    }
+
+    @ViewBuilder private var tabContent: some View {
+        switch ui.tab {
+        case .agents:
+            agentsContent
+        case .stats:
+            StatsView(store: store)
+        }
+    }
+
+    @ViewBuilder private var agentsContent: some View {
         if store.rows.isEmpty {
             Text("No live Claude Code sessions")
                 .font(.system(size: 12))

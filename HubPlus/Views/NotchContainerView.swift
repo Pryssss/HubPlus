@@ -17,7 +17,7 @@ struct NotchContainerView: View {
         ZStack {
             shape.fill(Color.black)
             if ui.expanded {
-                NotchRootView(store: store, onClose: onClose)
+                NotchRootView(store: store, ui: ui, onClose: onClose)
                     .gesture(
                         DragGesture(minimumDistance: 6)
                             .onChanged { _ in onDragChanged() }

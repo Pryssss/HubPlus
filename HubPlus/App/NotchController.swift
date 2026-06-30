@@ -2,10 +2,13 @@ import AppKit
 import SwiftUI
 import Combine
 
+enum NotchTab { case agents, stats }
+
 @MainActor
 final class NotchUIModel: ObservableObject {
     @Published var expanded = false
     @Published var vertical = false   // true when docked to a side edge
+    @Published var tab: NotchTab = .agents
 }
 
 /// Owns the island window. Collapsed pill ⇄ expanded panel. The pill is dragged with
