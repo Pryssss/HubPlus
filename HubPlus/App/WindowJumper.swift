@@ -26,8 +26,8 @@ enum WindowJumper {
             guard let tty = parseTTY(shell("ps", ["-o", "tty=", "-p", "\(pid)"])) else { return }
             guard let (termPID, kind) = findTerminal(of: pid) else { return }
             switch kind {
-            case .terminalApp: runScript(terminalScript(tty: tty))
-            case .iterm:       runScript(itermScript(tty: tty))
+            case .terminalApp: runScript(terminalScript(tty: tty)) { activate(pid: termPID) }
+            case .iterm:       runScript(itermScript(tty: tty)) { activate(pid: termPID) }
             case .other:       DispatchQueue.main.async { activate(pid: termPID) }
             }
         }
@@ -51,8 +51,15 @@ enum WindowJumper {
     private static func activate(pid: Int32) {
         NSRunningApplication(processIdentifier: pid)?.activate(options: [.activateAllWindows])
     }
-    private static func runScript(_ src: String) {
-        DispatchQueue.main.async { var err: NSDictionary?; NSAppleScript(source: src)?.executeAndReturnError(&err) }
+    /// Runs `src` on the main queue. If AppleScript returns an error (including
+    /// Automation permission denied on first use), `fallback` is invoked so the
+    /// caller can activate the app directly instead of silently doing nothing.
+    private static func runScript(_ src: String, fallback: @escaping () -> Void = {}) {
+        DispatchQueue.main.async {
+            var err: NSDictionary?
+            NSAppleScript(source: src)?.executeAndReturnError(&err)
+            if err != nil { fallback() }
+        }
     }
     private static func terminalScript(tty: String) -> String { """
     tell application "Terminal"
