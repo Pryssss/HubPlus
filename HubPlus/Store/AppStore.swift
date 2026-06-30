@@ -101,6 +101,10 @@ final class AppStore: ObservableObject {
         prevExhausted[label] = exhausted
 
         let pct = window.percentLeft
+        // Skip the low-threshold alert when the window just became exhausted:
+        // the "limit reached" notification already fired above, and firing
+        // "0% left" simultaneously would send a redundant second notification.
+        guard !exhausted else { prevLow[label] = pct; return }
         if AppStore.crossedLow(prev: prevLow[label], now: pct) {
             Notifier.notify("Claude \(label) at \(pct)% left")
         }
