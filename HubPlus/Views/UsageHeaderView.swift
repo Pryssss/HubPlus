@@ -3,6 +3,8 @@ import SwiftUI
 /// Subscription usage rows (5h / 7d) from `oauth/usage`.
 struct UsageHeaderView: View {
     let usage: UsageSnapshot?
+    let burn5h: BurnProjection?
+    let burn7d: BurnProjection?
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -17,11 +19,11 @@ struct UsageHeaderView: View {
                 case .unavailable:
                     note("usage unavailable")
                 case .ok:
-                    row(label: "5h", window: usage?.fiveHour)
-                    row(label: "7d", window: usage?.sevenDay)
+                    row(label: "5h", window: usage?.fiveHour, burn: burn5h)
+                    row(label: "7d", window: usage?.sevenDay, burn: burn7d)
                 case nil:
-                    row(label: "5h", window: nil)   // loading (no data yet)
-                    row(label: "7d", window: nil)
+                    row(label: "5h", window: nil, burn: nil)   // loading (no data yet)
+                    row(label: "7d", window: nil, burn: nil)
                 }
             }
             Spacer()
@@ -35,7 +37,7 @@ struct UsageHeaderView: View {
             .foregroundColor(.orange.opacity(0.9))
     }
 
-    private func row(label: String, window: UsageWindow?) -> some View {
+    private func row(label: String, window: UsageWindow?, burn: BurnProjection?) -> some View {
         HStack(spacing: 8) {
             Text(label)
                 .font(.system(size: 11))
@@ -52,11 +54,18 @@ struct UsageHeaderView: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary.opacity(0.8))
                 }
+                if let burn {
+                    Text("· \(burn.label) left")
+                        .font(.system(size: 11))
+                        .foregroundColor(burnColor(burn.hoursLeft))
+                }
             } else {
                 Text("—").font(.system(size: 11)).foregroundColor(.secondary)
             }
         }
     }
+
+    private func burnColor(_ h: Double) -> Color { h < 1 ? .red : (h < 3 ? .orange : .secondary) }
 
     /// Bar is green with room, yellow when low, red when nearly exhausted.
     private func barColor(_ window: UsageWindow?) -> Color {

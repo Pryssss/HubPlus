@@ -10,7 +10,7 @@ struct NotchRootView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             divider
-            UsageHeaderView(usage: store.usage)
+            UsageHeaderView(usage: store.usage, burn5h: store.burn5h, burn7d: store.burn7d)
             divider
             content
         }
