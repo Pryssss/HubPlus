@@ -25,6 +25,7 @@ targets:
         LSUIElement: false
         LSApplicationCategoryType: public.app-category.developer-tools
         NSHumanReadableCopyright: ""
+        NSAppleEventsUsageDescription: "Hub+ focuses the terminal window of the agent you tap."
     entitlements:
       path: HubPlus/Resources/HubPlus.entitlements
       properties:

@@ -4,6 +4,7 @@ import SwiftUI
 /// single-line last message.
 struct SessionCardView: View {
     let row: SessionRow
+    var onJump: (SessionRow) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -47,6 +48,11 @@ struct SessionCardView: View {
                     .help("Context window used")
             }
             Text(ageString).font(.system(size: 9)).foregroundColor(.secondary.opacity(0.7))
+            Button { onJump(row) } label: {
+                Image(systemName: "arrow.up.forward.app").font(.system(size: 11))
+            }
+            .buttonStyle(.plain).foregroundColor(.white.opacity(0.5))
+            .help("Jump to this agent's terminal window")
         }
     }
 

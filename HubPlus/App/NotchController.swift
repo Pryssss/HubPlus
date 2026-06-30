@@ -252,7 +252,8 @@ final class NotchController {
             onDragChanged: { [weak self] in self?.dragChanged() },
             onDragEnded: { [weak self] in self?.dragEnded() },
             onHover: { [weak self] inside in self?.hover(inside) },
-            onClose: { [weak self] in self?.close() }
+            onClose: { [weak self] in self?.close() },
+            onJump: { row in WindowJumper.jump(pid: Int32(row.info.pid)) }
         )
         let hosting = NSHostingController(rootView: container)
         let panel = NSPanel(contentViewController: hosting)

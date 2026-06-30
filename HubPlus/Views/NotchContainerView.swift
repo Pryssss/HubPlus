@@ -9,6 +9,7 @@ struct NotchContainerView: View {
     var onDragEnded: () -> Void
     var onHover: (Bool) -> Void
     var onClose: () -> Void
+    var onJump: (SessionRow) -> Void = { _ in }
 
     private var radius: CGFloat { ui.expanded ? 18 : 15 }
 
@@ -17,7 +18,7 @@ struct NotchContainerView: View {
         ZStack {
             shape.fill(Color.black)
             if ui.expanded {
-                NotchRootView(store: store, ui: ui, onClose: onClose)
+                NotchRootView(store: store, ui: ui, onClose: onClose, onJump: onJump)
                     .gesture(
                         DragGesture(minimumDistance: 6)
                             .onChanged { _ in onDragChanged() }

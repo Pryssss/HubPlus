@@ -6,6 +6,7 @@ struct NotchRootView: View {
     @ObservedObject var store: AppStore
     @ObservedObject var ui: NotchUIModel
     var onClose: () -> Void = {}
+    var onJump: (SessionRow) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -76,7 +77,7 @@ struct NotchRootView: View {
         } else {
             VStack(spacing: 0) {
                 ForEach(store.rows) { row in
-                    SessionCardView(row: row)
+                    SessionCardView(row: row, onJump: onJump)
                     if row.id != store.rows.last?.id {
                         Divider().overlay(Color.white.opacity(0.06))
                     }
