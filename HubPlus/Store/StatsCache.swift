@@ -29,4 +29,31 @@ enum StatsCache {
         f.dateFormat = "yyyy-MM-dd"
         return f.string(from: Date())
     }
+
+    /// Pure: sums `dailyModelTokens` per day for `days` days ending at `today`.
+    /// Missing days → 0.
+    static func dailyTokens(days: Int, json: Data, today: Date, calendar: Calendar = .current) -> [(date: Date, tokens: Int)] {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.calendar = calendar; f.timeZone = calendar.timeZone
+        var perDay: [String: Int] = [:]
+        if let root = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
+           let daily = root["dailyModelTokens"] as? [String: Any] {
+            for (day, models) in daily {
+                if let m = models as? [String: Any] {
+                    perDay[day] = m.values.reduce(0) { $0 + ((($1 as? NSNumber)?.intValue) ?? 0) }
+                }
+            }
+        }
+        return (0..<days).reversed().map { offset in
+            let date = calendar.date(byAdding: .day, value: -offset, to: today)!
+            return (date, perDay[f.string(from: date)] ?? 0)
+        }
+    }
+
+    /// Convenience: reads the real stats-cache file.
+    static func dailyTokens(days: Int = 7) -> [(date: Date, tokens: Int)] {
+        guard let data = try? Data(contentsOf: ClaudePaths.statsCache) else {
+            return (0..<days).reversed().map { (Calendar.current.date(byAdding: .day, value: -$0, to: Date())!, 0) }
+        }
+        return dailyTokens(days: days, json: data, today: Date())
+    }
 }
