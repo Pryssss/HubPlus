@@ -21,6 +21,7 @@ final class AppStore: ObservableObject {
     private var usageFailures = 0
     private var prevStatus: [String: SessionStatusKind] = [:]
     private var prevExhausted: [String: Bool] = [:]
+    private var prevLow: [String: Int] = [:]
     private let work = DispatchQueue(label: "com.hubplus.refresh", qos: .utility)
     private let refreshInterval: TimeInterval = 3.0
     private let usageInterval: TimeInterval = 60.0
@@ -98,6 +99,18 @@ final class AppStore: ObservableObject {
             }
         }
         prevExhausted[label] = exhausted
+
+        let pct = window.percentLeft
+        if AppStore.crossedLow(prev: prevLow[label], now: pct) {
+            Notifier.notify("Claude \(label) at \(pct)% left")
+        }
+        prevLow[label] = pct
+    }
+
+    /// True when `now` crosses into low territory (≤ threshold) from above (or from nil).
+    /// Pure and unit-tested via ThresholdAlertTests.
+    nonisolated static func crossedLow(prev: Int?, now: Int, threshold: Int = 20) -> Bool {
+        now <= threshold && (prev == nil || prev! > threshold)
     }
 
     /// Menu-bar badge next to the icon: surface what needs attention first (an agent
