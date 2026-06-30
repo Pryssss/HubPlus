@@ -23,11 +23,10 @@ enum ProjectUsageProbe {
         return total
     }
 
-    static func compute(now: Date, budget: TimeInterval = 1.5) -> (projects: [ProjectUsage], partial: Bool) {
-        let deadline = Date().addingTimeInterval(budget)
+    static func compute(now: Date, budget: TimeInterval = 1.5, root: URL = ClaudePaths.projectsDir) -> (projects: [ProjectUsage], partial: Bool) {
+        let deadline = now.addingTimeInterval(budget)
         let since = Calendar.current.startOfDay(for: now).timeIntervalSince1970
         let fm = FileManager.default
-        let root = ClaudePaths.projectsDir            // ~/.claude/projects
         guard let dirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.contentModificationDateKey]) else {
             return ([], false)
         }
