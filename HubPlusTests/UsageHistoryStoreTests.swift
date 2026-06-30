@@ -27,8 +27,7 @@ final class UsageHistoryStoreTests: XCTestCase {
         let url = tmp()
         var clock = 500.0
         let a = UsageHistoryStore(fileURL: url, now: { clock }); a.record(five: 7, seven: 3)
-        // Wait briefly for async write to complete
-        Thread.sleep(forTimeInterval: 0.2)
+        a.waitForPendingIO()
         let b = UsageHistoryStore(fileURL: url, now: { clock })
         XCTAssertEqual(b.samples.first?.five, 7)
     }

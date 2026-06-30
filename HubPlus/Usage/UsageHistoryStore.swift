@@ -35,6 +35,10 @@ final class UsageHistoryStore {
     func fiveSeries() -> [(t: Double, util: Double)] { samples.map { ($0.t, $0.five) } }
     func sevenSeries() -> [(t: Double, util: Double)] { samples.map { ($0.t, $0.seven) } }
 
+    /// Blocks until all pending async IO operations have completed.
+    /// Intended for use in tests to synchronize against the write path.
+    func waitForPendingIO() { io.sync {} }
+
     /// Default on-disk location.
     static func defaultURL() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
