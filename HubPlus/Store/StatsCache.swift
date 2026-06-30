@@ -40,6 +40,9 @@ enum StatsCache {
             for (day, models) in daily {
                 if let m = models as? [String: Any] {
                     perDay[day] = m.values.reduce(0) { $0 + ((($1 as? NSNumber)?.intValue) ?? 0) }
+                } else if let n = (models as? NSNumber)?.intValue {
+                    // scalar shape: "YYYY-MM-DD": 12345  (Int or Double)
+                    perDay[day] = n
                 }
             }
         }
