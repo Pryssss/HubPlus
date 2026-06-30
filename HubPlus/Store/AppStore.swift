@@ -8,6 +8,9 @@ final class AppStore: ObservableObject {
     @Published private(set) var rows: [SessionRow] = []
     @Published private(set) var tokensToday: Int?
     @Published private(set) var usage: UsageSnapshot?
+    @Published private(set) var burn5h: BurnProjection?
+    @Published private(set) var burn7d: BurnProjection?
+    let history = UsageHistoryStore(fileURL: UsageHistoryStore.defaultURL())
 
     private var timer: Timer?
     private var usageTimer: Timer?
@@ -56,6 +59,10 @@ final class AppStore: ObservableObject {
             usageFailures = 0
             notifyUsageTransitions(snapshot)
             usage = snapshot
+            if let f = snapshot.fiveHour?.utilization, let s = snapshot.sevenDay?.utilization {
+                history.record(five: f, seven: s)
+            }
+            recomputeBurn()
         case .authError:
             usageFailures = 0
             usage = UsageSnapshot(state: .authError)
@@ -128,6 +135,15 @@ final class AppStore: ObservableObject {
         notifySessionTransitions(newRows)
         rows = newRows
     }
+
+    private func recomputeBurn() {
+        let now = Date().timeIntervalSince1970
+        burn5h = BurnRate.project(history.fiveSeries(), now: now)
+        burn7d = BurnRate.project(history.sevenSeries(), now: now)
+    }
+
+    func fiveSeries() -> [(t: Double, util: Double)] { history.fiveSeries() }
+    func sevenSeries() -> [(t: Double, util: Double)] { history.sevenSeries() }
 
     /// Notify when an agent newly finishes (busy/waiting → idle) or newly needs
     /// the user (→ waiting). Baseline is set silently on first sight of a session.
