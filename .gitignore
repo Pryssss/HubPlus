@@ -9,3 +9,5 @@ xcuserdata/
 bin/
 obj/
 .dd/
+.superpowers/
+.build/

@@ -33,7 +33,14 @@ enum StatsCache {
     /// Pure: sums `dailyModelTokens` per day for `days` days ending at `today`.
     /// Missing days → 0.
     static func dailyTokens(days: Int, json: Data, today: Date, calendar: Calendar = .current) -> [(date: Date, tokens: Int)] {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.calendar = calendar; f.timeZone = calendar.timeZone
+        // The cache keys are always Gregorian ASCII ("2026-06-30"); format the lookup
+        // key the same way regardless of the user's system calendar/locale (a Buddhist
+        // or Arabic-digit locale would otherwise never match and the chart reads 0).
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = calendar.timeZone
+        f.dateFormat = "yyyy-MM-dd"
         var perDay: [String: Int] = [:]
         if let root = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
            let daily = root["dailyModelTokens"] as? [String: Any] {

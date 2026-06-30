@@ -17,7 +17,7 @@ struct StatsView: View {
             }.frame(height: 36)
             Divider().opacity(0.2)
             Text("By project today").font(.system(size: 10)).foregroundColor(.secondary)
-            ForEach(store.projectUsage.prefix(6), id: \.name) { p in
+            ForEach(store.projectUsage.prefix(6), id: \.id) { p in
                 HStack {
                     Text(p.name).font(.system(size: 11)).foregroundColor(.white).lineLimit(1)
                     Spacer()
@@ -33,7 +33,12 @@ struct StatsView: View {
     private func sparkRow(_ label: String, _ vals: [Double], _ burn: BurnProjection?, _ c: Color) -> some View {
         HStack(spacing: 8) {
             Text(label).font(.system(size: 11)).foregroundColor(.secondary).frame(width: 18, alignment: .leading)
-            Sparkline(values: vals, color: c).frame(width: 120, height: 24)
+            if vals.count < 2 {
+                Text("collecting…").font(.system(size: 10)).foregroundColor(.secondary.opacity(0.6))
+                    .frame(width: 120, height: 24, alignment: .leading)
+            } else {
+                Sparkline(values: vals, color: c).frame(width: 120, height: 24)
+            }
             if let burn { Text(burn.label).font(.system(size: 10)).foregroundColor(.secondary) }
         }
     }

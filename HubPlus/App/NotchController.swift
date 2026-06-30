@@ -49,8 +49,13 @@ final class NotchController {
         if let e = d.string(forKey: "pillEdge"), let parsed = Edge(rawValue: e) { edge = parsed }
         ui.vertical = isVerticalEdge
         tabCancellable = ui.$tab.sink { [weak self] tab in
-            guard tab == .stats else { return }
-            MainActor.assumeIsolated { self?.store.refreshStats(force: true) }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if tab == .stats { self.store.refreshStats(force: true) }
+                // Defer the resize so `ui.tab` has committed (the @Published sink
+                // fires in willSet); both tabs then size to their own content.
+                DispatchQueue.main.async { if self.ui.expanded { self.applyFrame(animated: true) } }
+            }
         }
     }
 
@@ -145,8 +150,12 @@ final class NotchController {
     }
 
     private func expandedHeight() -> CGFloat {
-        let rows = max(store.rows.count, 1)
-        let h: CGFloat = 20 + 34 + 68 + CGFloat(rows) * 52
+        let chrome: CGFloat = 20 + 34 + 68 + 40   // padding + header + usage + tab switcher
+        let h: CGFloat
+        switch ui.tab {
+        case .agents: h = chrome + CGFloat(max(store.rows.count, 1)) * 52
+        case .stats:  h = chrome + 330             // sparklines + daily bars + project list
+        }
         let maxH = (notchScreen()?.frame.height ?? 800) - 80
         return min(h, maxH)
     }

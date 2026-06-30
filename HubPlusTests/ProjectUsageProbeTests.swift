@@ -34,4 +34,16 @@ final class ProjectUsageProbeTests: XCTestCase {
 
         try? FileManager.default.removeItem(at: tmpRoot)
     }
+
+    func testExtractCwdReadsRealPathForCorrectName() {
+        // The display name must come from the transcript's real cwd, not the lossy
+        // encoded dir name (which collapses "my-cool-app" → "app").
+        let lines = [
+            "no cwd here",
+            #"{"type":"user","cwd":"/Users/me/my-cool-app","timestamp":"2026-06-30T10:00:00Z"}"#,
+        ]
+        let cwd = ProjectUsageProbe.extractCwd(jsonlLines: lines)
+        XCTAssertEqual(cwd, "/Users/me/my-cool-app")
+        XCTAssertEqual((cwd! as NSString).lastPathComponent, "my-cool-app")
+    }
 }

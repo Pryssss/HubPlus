@@ -1,8 +1,19 @@
 import Foundation
 
-struct ProjectUsage: Equatable { let name: String; let tokensToday: Int?; let sessionCount: Int }
+struct ProjectUsage: Equatable, Identifiable { let id: String; let name: String; let tokensToday: Int?; let sessionCount: Int }
 
 enum ProjectUsageProbe {
+    /// The real absolute cwd recorded in the transcript, so we never have to decode
+    /// the lossy encoded dir name (which collapses hyphens in "my-cool-app" → "app").
+    static func extractCwd(jsonlLines: [String]) -> String? {
+        for line in jsonlLines {
+            if let data = line.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let cwd = obj["cwd"] as? String, !cwd.isEmpty { return cwd }
+        }
+        return nil
+    }
+
     static func sumTokens(jsonlLines: [String], sinceEpoch: Double) -> Int {
         let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let isoPlain = ISO8601DateFormatter()
@@ -41,13 +52,18 @@ enum ProjectUsageProbe {
             }
             guard touchedToday else { continue }
             var tokens = 0
+            var cwd: String?
             for f in jsonl {
                 if Date() > deadline { partial = true; break }
                 if let text = try? String(contentsOf: f, encoding: .utf8) {
-                    tokens += sumTokens(jsonlLines: text.split(separator: "\n").map(String.init), sinceEpoch: since)
+                    let lines = text.split(separator: "\n").map(String.init)
+                    tokens += sumTokens(jsonlLines: lines, sinceEpoch: since)
+                    if cwd == nil { cwd = extractCwd(jsonlLines: lines) }
                 }
             }
-            out.append(ProjectUsage(name: SessionRow.projectName(forEncodedDir: dir.lastPathComponent),
+            let name = cwd.map { ($0 as NSString).lastPathComponent }
+                ?? SessionRow.projectName(forEncodedDir: dir.lastPathComponent)
+            out.append(ProjectUsage(id: dir.lastPathComponent, name: name,
                                     tokensToday: tokens, sessionCount: jsonl.count))
         }
         return (out.sorted { ($0.tokensToday ?? 0) > ($1.tokensToday ?? 0) }, partial)

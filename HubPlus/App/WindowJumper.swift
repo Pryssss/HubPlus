@@ -20,17 +20,21 @@ enum WindowJumper {
         return nil
     }
 
-    /// Off-main. Only numeric pid/tty are passed to AppleScript.
+    /// Off-main. Only the numeric pid and the validated tty are passed to AppleScript.
     static func jump(pid: Int32) {
         DispatchQueue.global(qos: .userInitiated).async {
             guard let tty = parseTTY(shell("ps", ["-o", "tty=", "-p", "\(pid)"])) else { return }
             guard let (termPID, kind) = findTerminal(of: pid) else { return }
             switch kind {
-            case .terminalApp: runScript(terminalScript(tty: tty)) { activate(pid: termPID) }
-            case .iterm:       runScript(itermScript(tty: tty)) { activate(pid: termPID) }
-            case .other:       DispatchQueue.main.async { activate(pid: termPID) }
+            case .terminalApp: if !runScript(terminalScript(tty: tty)) { activateMain(termPID) }
+            case .iterm:       if !runScript(itermScript(tty: tty)) { activateMain(termPID) }
+            case .other:       activateMain(termPID)
             }
         }
+    }
+
+    private static func activateMain(_ pid: Int32) {
+        DispatchQueue.main.async { activate(pid: pid) }
     }
 
     // walk parent pids until a known terminal; returns (terminalPID, kind)
@@ -51,15 +55,22 @@ enum WindowJumper {
     private static func activate(pid: Int32) {
         NSRunningApplication(processIdentifier: pid)?.activate(options: [.activateAllWindows])
     }
-    /// Runs `src` on the main queue. If AppleScript returns an error (including
-    /// Automation permission denied on first use), `fallback` is invoked so the
-    /// caller can activate the app directly instead of silently doing nothing.
-    private static func runScript(_ src: String, fallback: @escaping () -> Void = {}) {
-        DispatchQueue.main.async {
-            var err: NSDictionary?
-            NSAppleScript(source: src)?.executeAndReturnError(&err)
-            if err != nil { fallback() }
-        }
+    /// Runs an AppleScript via `/usr/bin/osascript` on the CURRENT (background)
+    /// thread, so the first-use Automation consent prompt and the window/tab scan
+    /// never block the main thread / freeze the HUD. Returns true on success.
+    /// Only the validated numeric `tty` is interpolated into `src`.
+    @discardableResult
+    private static func runScript(_ src: String) -> Bool {
+        let p = Process()
+        p.launchPath = "/usr/bin/osascript"        // no file arg → reads script from stdin
+        let stdin = Pipe()
+        p.standardInput = stdin
+        p.standardOutput = Pipe(); p.standardError = Pipe()
+        do { try p.run() } catch { return false }
+        stdin.fileHandleForWriting.write(Data(src.utf8))
+        stdin.fileHandleForWriting.closeFile()
+        p.waitUntilExit()
+        return p.terminationStatus == 0
     }
     private static func terminalScript(tty: String) -> String { """
     tell application "Terminal"
