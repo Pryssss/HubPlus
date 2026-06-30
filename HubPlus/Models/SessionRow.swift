@@ -15,6 +15,15 @@ struct SessionRow: Identifiable, Equatable {
         let cwd = transcript?.cwd ?? info.cwd
         return (cwd as NSString).lastPathComponent
     }
+
+    /// Best-effort human name from an encoded project directory name.
+    /// Claude Code encodes the absolute cwd by replacing every non-alphanumeric
+    /// character with "-", so "/Users/me/my-project" → "-Users-me-my-project".
+    /// We return the last non-empty dash-separated token as the display name.
+    static func projectName(forEncodedDir encoded: String) -> String {
+        let parts = encoded.split(separator: "-").map(String.init).filter { !$0.isEmpty }
+        return parts.last ?? encoded
+    }
 }
 
 /// What we extract from the tail of a session transcript.
