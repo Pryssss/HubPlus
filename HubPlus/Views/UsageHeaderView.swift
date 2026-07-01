@@ -55,9 +55,12 @@ struct UsageHeaderView: View {
                         .foregroundColor(.secondary.opacity(0.8))
                 }
                 if let burn {
-                    Text("· \(burn.label) left")
-                        .font(.system(size: 11))
-                        .foregroundColor(burnColor(burn.hoursLeft))
+                    HStack(spacing: 2) {
+                        Image(systemName: "flame.fill").font(.system(size: 9))
+                        Text("\(burn.label) left").font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(burnColor(burn.hoursLeft))
+                    .help("Time to limit at the current pace")
                 }
             } else {
                 Text("—").font(.system(size: 11)).foregroundColor(.secondary)

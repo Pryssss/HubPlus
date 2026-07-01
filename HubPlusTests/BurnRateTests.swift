@@ -29,4 +29,20 @@ final class BurnRateTests: XCTestCase {
     func testInsufficientSamples() {
         XCTAssertNil(BurnRate.project([(10_000, 50)], now: 10_000))
     }
+    func testLeastSquaresWithLargeEpochTimestamps() {
+        // 3-sample least-squares on realistic epoch values exercises the timestamp
+        // centering that prevents catastrophic cancellation. Perfect 12%/h line → 4h.
+        let now = 1_750_000_000.0
+        let s = [(t: now - 3600, util: 40.0), (t: now - 1800, util: 46.0), (t: now, util: 52.0)]
+        let p = BurnRate.project(s, now: now)
+        XCTAssertNotNil(p)
+        XCTAssertEqual(p!.hoursLeft, 4.0, accuracy: 0.2)
+    }
+    func testProjectsFromPostResetClimb() {
+        // A reset mid-window (util drops 90→10) must not suppress the projection:
+        // it should use the post-reset climb (10→20).
+        let now = 5_000.0
+        let s = [(t: now - 1200, util: 90.0), (t: now - 600, util: 10.0), (t: now, util: 20.0)]
+        XCTAssertNotNil(BurnRate.project(s, now: now))
+    }
 }
