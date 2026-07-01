@@ -33,6 +33,7 @@ final class NotchController {
     private var collapseWork: DispatchWorkItem?
     private var clickMonitor: Any?
     private var tabCancellable: AnyCancellable?
+    private var projectsCancellable: AnyCancellable?
 
     private var isVerticalEdge: Bool { edge == .left || edge == .right }
     private var collapsedSize: NSSize {
@@ -55,6 +56,13 @@ final class NotchController {
                 // Defer the resize so `ui.tab` has committed (the @Published sink
                 // fires in willSet); both tabs then size to their own content.
                 DispatchQueue.main.async { if self.ui.expanded { self.applyFrame(animated: true) } }
+            }
+        }
+        // The per-project scan is async; re-fit the Stats panel once results land.
+        projectsCancellable = store.$projectUsage.sink { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.ui.tab == .stats, self.ui.expanded else { return }
+                DispatchQueue.main.async { self.applyFrame(animated: true) }
             }
         }
     }
@@ -153,8 +161,15 @@ final class NotchController {
         let chrome: CGFloat = 20 + 34 + 68 + 40   // padding + header + usage + tab switcher
         let h: CGFloat
         switch ui.tab {
-        case .agents: h = chrome + CGFloat(max(store.rows.count, 1)) * 52
-        case .stats:  h = chrome + 330             // sparklines + daily bars + project list
+        case .agents:
+            h = chrome + CGFloat(max(store.rows.count, 1)) * 52
+        case .stats:
+            // Size to actual content — two spark rows + daily-token bars + one row per
+            // project (up to 6) — so an idle/early Stats tab isn't mostly empty.
+            let projects = CGFloat(min(store.projectUsage.count, 6))
+            let partial: CGFloat = store.partialProjects ? 20 : 0
+            let statsBody: CGFloat = 176 + projects * 24 + partial
+            h = chrome + statsBody
         }
         let maxH = (notchScreen()?.frame.height ?? 800) - 80
         return min(h, maxH)
