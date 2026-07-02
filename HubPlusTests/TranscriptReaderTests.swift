@@ -80,14 +80,16 @@ final class TranscriptReaderTests: XCTestCase {
         let cwd = "/Users/me/project-cwd"
         let lines = [
             #"{"type":"user","cwd":"/Users/me/project-cwd/sub1"}"#,
-            // Empty cwd must not overwrite a previously-seen good value.
-            #"{"type":"user","cwd":""}"#,
             #"{"type":"user","cwd":"/Users/me/project-cwd/sub2"}"#,
+            // Empty cwd LAST: this ordering is what makes the !c.isEmpty guard observable.
+            // If that guard regressed, this trailing line would clobber sub2 with "" and the
+            // assertion below would fail; an empty line in the middle would be masked by sub2.
+            #"{"type":"user","cwd":""}"#,
         ]
         try writeFixture(root: root, cwd: cwd, sessionId: "s1", content: lines.joined(separator: "\n"))
 
         let snap = TranscriptReader.snapshot(cwd: cwd, sessionId: "s1", root: root)
-        XCTAssertEqual(snap?.cwd, "/Users/me/project-cwd/sub2", "the latest non-empty cwd in file order must win")
+        XCTAssertEqual(snap?.cwd, "/Users/me/project-cwd/sub2", "the latest non-empty cwd must win; a trailing empty cwd must not clobber it")
     }
 
     // MARK: - sanitize()
