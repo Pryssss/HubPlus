@@ -5,7 +5,9 @@ enum GitProbe {
     private static let gitPath = "/usr/bin/git"
 
     static func probe(cwd: String) -> GitInfo? {
-        guard FileManager.default.fileExists(atPath: cwd) else { return nil }
+        // No fileExists pre-check: it also blocks on a dead network mount.
+        // Let `git -C` fail fast instead -- Shell.run returns nil on
+        // non-zero exit (or timeout), which already yields probe -> nil.
         guard Shell.run(gitPath, ["-C", cwd, "rev-parse", "--is-inside-work-tree"]) == "true"
         else { return nil }
 
