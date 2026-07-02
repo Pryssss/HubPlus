@@ -23,6 +23,9 @@ final class AppStore: ObservableObject {
     private var prevExhausted: [String: Bool] = [:]
     private var prevLow: [String: Int] = [:]
     private let work = DispatchQueue(label: "com.hubplus.refresh", qos: .utility)
+    // Separate queue so a slow project-usage scan (tens/hundreds-of-MB transcripts)
+    // never delays the 3 s session refresh, which shares `work` above.
+    private let statsQueue = DispatchQueue(label: "com.hubplus.stats", qos: .utility)
     private let refreshInterval: TimeInterval = 3.0
     private let usageInterval: TimeInterval = 60.0
 
@@ -169,7 +172,7 @@ final class AppStore: ObservableObject {
     func refreshStats(force: Bool = false) {
         if !force, Date().timeIntervalSince(lastStats) < 30 { return }
         lastStats = Date()
-        work.async { [weak self] in
+        statsQueue.async { [weak self] in
             let daily = StatsCache.dailyTokens(days: 7)
             let (projects, partial) = ProjectUsageProbe.compute(now: Date())
             DispatchQueue.main.async {
