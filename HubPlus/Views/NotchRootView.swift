@@ -62,7 +62,7 @@ struct NotchRootView: View {
                 .font(.system(size: 14, weight: .semibold))
             Spacer()
             if let today = store.tokensToday {
-                Label("\(formatK(today)) today", systemImage: "bolt.fill")
+                Label("\(TokenFormat.compact(today)) today", systemImage: "bolt.fill")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
@@ -103,23 +103,29 @@ struct NotchRootView: View {
 
     @ViewBuilder private var agentsContent: some View {
         if store.rows.isEmpty {
-            Text("No live Claude Code sessions")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 16)
+            VStack(spacing: 3) {
+                Text("No live Claude Code sessions")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                Text("Sessions appear when `claude` runs in a terminal")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary.opacity(0.6))
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 16)
         } else {
+            let rows = SessionRow.urgencySorted(store.rows)
             VStack(spacing: 0) {
-                ForEach(store.rows) { row in
+                ForEach(rows) { row in
                     SessionCardView(row: row, onJump: onJump)
-                    if row.id != store.rows.last?.id {
+                    if row.id != rows.last?.id {
                         Divider().overlay(Color.white.opacity(0.06))
                     }
                 }
             }
+            .animation(.default, value: rows.map(\.id))
         }
     }
 
     private var divider: some View { Divider().overlay(Color.white.opacity(0.08)) }
-    private func formatK(_ n: Int) -> String { n >= 1000 ? "\(n / 1000)k" : "\(n)" }
 }

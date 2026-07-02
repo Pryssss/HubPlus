@@ -34,6 +34,10 @@ struct SessionCardView: View {
                     if row.git?.isDirty == true {
                         Circle().fill(Color.yellow).frame(width: 4, height: 4)
                     }
+                    if let git = row.git, git.ahead > 0 || git.behind > 0 {
+                        Text(divergenceLabel(git))
+                            .font(.system(size: 9))
+                    }
                 }
                 .foregroundColor(.secondary)
                 .lineLimit(1)
@@ -62,6 +66,9 @@ struct SessionCardView: View {
         HStack(spacing: 4) {
             Circle().fill(statusColor).frame(width: 5, height: 5)
             Text(statusLabel).font(.system(size: 9, weight: .semibold))
+            if let duration = DurationFormat.compactSince(row.info.statusUpdatedAt) {
+                Text("· \(duration)").font(.system(size: 9, weight: .medium)).opacity(0.85)
+            }
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 2)
@@ -112,6 +119,12 @@ struct SessionCardView: View {
         if pct >= 0.9 { return .red }
         if pct >= 0.75 { return .orange }
         return .gray
+    }
+
+    private func divergenceLabel(_ git: GitInfo) -> String {
+        [git.ahead > 0 ? "↑\(git.ahead)" : nil, git.behind > 0 ? "↓\(git.behind)" : nil]
+            .compactMap { $0 }
+            .joined(separator: " ")
     }
 
     private var ageString: String {
