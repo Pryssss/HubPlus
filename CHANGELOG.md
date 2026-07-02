@@ -7,9 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
-- Two permanent-freeze paths in git subprocess handling: stderr is now drained instead
-  of blocking on a full pipe buffer, and a kill-on-timeout watchdog stops hung `git`
-  processes.
+- Permanent-freeze paths in git subprocess handling: stderr is now drained instead of
+  blocking on a full pipe buffer, a kill-on-timeout watchdog stops hung `git` processes,
+  and the caller is now bounded by its own parent-side deadline (not just the watchdog),
+  so a child stuck in uninterruptible I/O (dead SMB/NFS mount) or a helper process that
+  keeps the output pipe open past the kill can no longer block the caller forever either.
 - Expanded panel clipping when new sessions appear — the panel now self-sizes to its
   SwiftUI content instead of using hand-computed heights.
 
@@ -21,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Parser test coverage for transcript reading and the usage endpoint.
+- GitHub Actions CI (macOS test job + Windows build job), single-source app versioning
+  via `project.yml`, and a scripted dmg release (`scripts/make-dmg.sh`).
 
 ## [0.1.0] - 2026-07-02
 

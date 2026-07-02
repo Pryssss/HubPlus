@@ -214,7 +214,20 @@ enum ProjectUsageProbe {
                 }
 
                 guard let r = scanFile(at: f, startingAt: startOffset, sinceEpoch: since,
-                                       deadline: deadline, chunkSize: chunkSize) else { continue }
+                                       deadline: deadline, chunkSize: chunkSize) else {
+                    // Transient open failure (file deleted/unreadable between the
+                    // directory listing above and this open attempt): fall back to the
+                    // last known total instead of contributing 0 and dipping the
+                    // displayed sum for this tick. A *real* deletion is handled below by
+                    // the seenByDir prune, not here, so re-adding the cached entry to
+                    // `updates` doesn't mask a genuine removal.
+                    if let cached = cacheSnapshot[key] {
+                        tokens += cached.totalTokens
+                        if cwd == nil { cwd = cached.cwd }
+                        updates[key] = cached
+                    }
+                    continue
+                }
                 let boundary = baseTokens + r.boundaryTokens
                 let total = boundary + r.tailTokens
                 let fileCwd = baseCwd ?? r.cwd

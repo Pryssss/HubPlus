@@ -10,6 +10,12 @@ struct SessionRow: Identifiable, Equatable {
     /// later. No UI use yet.
     var providerID: String = "claude"
 
+    // Bare session id, not namespaced by provider. AppStore keys transition state
+    // (notifications, "was this row here last refresh") by `id`, and SwiftUI's ForEach
+    // relies on it for identity, so a second AgentProvider whose ids happen to collide
+    // with Claude's would corrupt both. TODO(second provider): namespace as
+    // "\(providerID):\(info.sessionId)" at that point -- left bare for now so behavior
+    // stays byte-for-byte identical while only one provider exists.
     var id: String { info.sessionId }
 
     /// Display name: prefer the git repo name, else the cwd's folder name — never

@@ -207,6 +207,57 @@ final class ProjectUsageProbeTests: XCTestCase {
                        "the surviving file's entry must be retained")
     }
 
+    /// When a file that appeared in the directory listing can no longer be opened by the
+    /// time the scan reaches it (deleted or made unreadable between listing and open),
+    /// the tick must fall back to the last cached total for that file instead of
+    /// contributing 0 and dipping the displayed sum. Simulated deterministically via
+    /// chmod 000 (no sleeps, no real dead mount): after priming the cache with a normal
+    /// compute(), the file is appended to (so its size/mtime no longer match the cache,
+    /// forcing a rescan attempt) and then made unreadable, so scanFile's open fails and
+    /// the fallback path is exercised. This is a different case from
+    /// testCacheEntryPrunedWhenFileDeletedFromScannedDirectory: there the file is *gone*
+    /// at enumeration time (correctly drops to 0 via pruning); here it's still listed but
+    /// fails to open (must NOT drop to 0).
+    func testUnreadableFileFallsBackToCachedTotalInsteadOfZero() throws {
+        let tmpRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("probe-\(UUID().uuidString)", isDirectory: true)
+        let projectDir = tmpRoot.appendingPathComponent("proj1", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        let file = projectDir.appendingPathComponent("session.jsonl")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path)
+            try? FileManager.default.removeItem(at: tmpRoot)
+        }
+
+        let now = Date()
+        let ts = ISO8601DateFormatter().string(from: now)
+        let line1 = #"{"timestamp":"\#(ts)","message":{"usage":{"input_tokens":10,"output_tokens":5}}}"#
+        try (line1 + "\n").write(to: file, atomically: true, encoding: .utf8)
+
+        let first = ProjectUsageProbe.compute(now: now, root: tmpRoot)
+        XCTAssertEqual(first.projects.first?.tokensToday, 15)
+
+        // Append (changes size/mtime, so the cache can no longer take the "unchanged
+        // file, no read at all" fast path) then revoke read permission so the resulting
+        // rescan attempt's open fails.
+        let line2 = #"{"timestamp":"\#(ts)","message":{"usage":{"input_tokens":7,"output_tokens":3}}}"#
+        let handle = try FileHandle(forWritingTo: file)
+        handle.seekToEndOfFile()
+        handle.write((line2 + "\n").data(using: .utf8)!)
+        try handle.close()
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: file.path)
+
+        // Some environments (e.g. a container running tests as root) ignore chmod 000;
+        // skip rather than assert a false failure if this machine can't simulate it.
+        guard (try? FileHandle(forReadingFrom: file)) == nil else {
+            throw XCTSkip("this environment can still read a chmod 000 file; cannot simulate deterministically")
+        }
+
+        let second = ProjectUsageProbe.compute(now: now, root: tmpRoot)
+        XCTAssertEqual(second.projects.first?.tokensToday, 15,
+                        "an unreadable file must fall back to its last cached total (15), not drop to 0")
+    }
+
     /// Convergence: a scan interrupted by the deadline must resume from its stored byte
     /// offset on the next compute(), not restart from byte 0. The incomplete entry is
     /// seeded directly (a real mid-scan deadline expiry depends on wall-clock timing) with
