@@ -89,3 +89,29 @@ enum ModelCatalog {
         return model ?? "—"
     }
 }
+
+extension SessionStatusKind {
+    /// Lower = needs the user sooner. Drives the Agents tab ordering.
+    var urgencyRank: Int {
+        switch self {
+        case .waiting: return 0
+        case .error:   return 1
+        case .busy:    return 2
+        case .idle:    return 3
+        case .unknown: return 4
+        }
+    }
+}
+
+extension SessionRow {
+    /// Waiting first, then error/busy/idle/unknown; alphabetical by title
+    /// within a rank so the order is deterministic across refreshes.
+    static func urgencySorted(_ rows: [SessionRow]) -> [SessionRow] {
+        rows.sorted { a, b in
+            let ra = a.info.statusKind.urgencyRank
+            let rb = b.info.statusKind.urgencyRank
+            if ra != rb { return ra < rb }
+            return a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+        }
+    }
+}
