@@ -2,10 +2,13 @@ import Foundation
 
 /// Reads the live-session registry, dropping entries whose process is dead.
 enum SessionWatcher {
-    static func readLiveSessions() -> [SessionInfo] {
+    /// `root` defaults to the real `~/.claude/sessions` dir so every existing call site is
+    /// unchanged; tests pass a fixture directory laid out the same way (mirrors the
+    /// `TranscriptReader.snapshot(root:)` / `ProjectUsageProbe.compute(root:)` pattern).
+    static func readLiveSessions(root: URL = ClaudePaths.sessionsDir) -> [SessionInfo] {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(
-            at: ClaudePaths.sessionsDir,
+            at: root,
             includingPropertiesForKeys: nil
         ) else { return [] }
 

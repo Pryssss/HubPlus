@@ -4,8 +4,12 @@ import Foundation
 /// Shape is best-effort: `dailyModelTokens[<yyyy-MM-dd>]` is either a number or a
 /// `{ model: tokens }` map. Returns nil if absent/unrecognized.
 enum StatsCache {
-    static func tokensToday() -> Int? {
-        guard let data = try? Data(contentsOf: ClaudePaths.statsCache),
+    /// `statsCache` defaults to the real `~/.claude/stats-cache.json` file so every call
+    /// site is unchanged; tests point it at a fixture file. (Named for the file it reads
+    /// rather than "root", since this static reads a single file, not a directory tree —
+    /// the "or equivalent" injectable requested for testability.)
+    static func tokensToday(statsCache: URL = ClaudePaths.statsCache) -> Int? {
+        guard let data = try? Data(contentsOf: statsCache),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let daily = obj["dailyModelTokens"] as? [String: Any]
         else { return nil }

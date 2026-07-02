@@ -5,6 +5,10 @@ struct SessionRow: Identifiable, Equatable {
     let info: SessionInfo
     var transcript: TranscriptSnapshot?
     var git: GitInfo?
+    /// Which provider produced this row. Defaults to `"claude"` so every existing
+    /// construction site is unchanged; lets views/notifications distinguish sources
+    /// later. No UI use yet.
+    var providerID: String = "claude"
 
     var id: String { info.sessionId }
 

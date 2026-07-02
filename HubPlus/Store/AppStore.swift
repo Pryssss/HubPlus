@@ -13,8 +13,22 @@ final class AppStore: ObservableObject {
     @Published private(set) var projectUsage: [ProjectUsage] = []
     @Published private(set) var partialProjects = false
     @Published private(set) var dailyTokens: [(date: Date, tokens: Int)] = []
-    let history = UsageHistoryStore(fileURL: UsageHistoryStore.defaultURL())
+    let history: UsageHistoryStore
     private var lastStats = Date.distantPast
+
+    // Injectable seams. Defaults reproduce today's behavior exactly (single Claude
+    // provider, OAuth usage). Tests inject fakes + a temp-file history store so
+    // constructing AppStore never touches ~/.claude or real Application Support.
+    private let agents: [any AgentProvider]
+    private let usageProvider: any UsageProvider
+
+    init(agents: [any AgentProvider] = [ClaudeAgentProvider()],
+         usage: any UsageProvider = ClaudeOAuthUsageProvider(),
+         history: UsageHistoryStore = UsageHistoryStore(fileURL: UsageHistoryStore.defaultURL())) {
+        self.agents = agents
+        self.usageProvider = usage
+        self.history = history
+    }
 
     private var timer: Timer?
     private var usageTimer: Timer?
@@ -55,8 +69,12 @@ final class AppStore: ObservableObject {
     /// Fetch subscription usage off-main (the Keychain read may prompt and the
     /// network call must not block the UI), then publish on the main actor.
     func refreshUsage() {
+        // Read the provider on the main actor (we're main-isolated here), then fetch on a
+        // detached task so the Keychain read + network call stay off-main, exactly as when
+        // this lived inside UsageClient.fetch().
+        let usageProvider = self.usageProvider
         Task.detached { [weak self] in
-            let result = await UsageClient.fetch()
+            let result = await usageProvider.fetch()
             await MainActor.run { self?.applyUsage(result) }
         }
     }
@@ -139,13 +157,19 @@ final class AppStore: ObservableObject {
     }
 
     func refresh() {
+        // Snapshot the providers on the main actor before hopping to the background queue;
+        // GitProbe/StatsCache stay direct (host-machine concerns, not per-provider).
+        let agents = self.agents
         work.async { [weak self] in
             guard self != nil else { return }
-            let sessions = SessionWatcher.readLiveSessions()
-            let rows = sessions.map { s -> SessionRow in
-                let transcript = TranscriptReader.snapshot(cwd: s.cwd, sessionId: s.sessionId)
-                let effectiveCwd = transcript?.cwd ?? s.cwd
-                return SessionRow(info: s, transcript: transcript, git: GitProbe.probe(cwd: effectiveCwd))
+            let rows = agents.flatMap { provider -> [SessionRow] in
+                provider.liveSessions().map { s -> SessionRow in
+                    let transcript = provider.transcriptSnapshot(cwd: s.cwd, sessionId: s.sessionId)
+                    let effectiveCwd = transcript?.cwd ?? s.cwd
+                    return SessionRow(info: s, transcript: transcript,
+                                      git: GitProbe.probe(cwd: effectiveCwd),
+                                      providerID: provider.id)
+                }
             }
             let today = StatsCache.tokensToday()
             DispatchQueue.main.async {

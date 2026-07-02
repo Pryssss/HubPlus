@@ -13,9 +13,10 @@ enum UsageResult {
 enum UsageClient {
     private static let endpoint = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
-    static func fetch() async -> UsageResult {
-        guard let token = KeychainReader.claudeCodeToken() else { return .authError }
-
+    /// Token acquisition moved out to the provider (`ClaudeOAuthUsageProvider`) so a
+    /// future local-estimation provider needs no token; the caller passes an already-read
+    /// OAuth token here.
+    static func fetch(token: String) async -> UsageResult {
         var req = URLRequest(url: endpoint)
         req.httpMethod = "GET"
         req.timeoutInterval = 15
