@@ -26,6 +26,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusItem()
         observeStore()
         registerGlobalHotkey()
+
+        // Dev affordance: HUBPLUS_OPEN=stats|agents force-expands the panel on launch
+        // so UI states can be screenshotted/verified without synthetic mouse events.
+        switch ProcessInfo.processInfo.environment["HUBPLUS_OPEN"] {
+        case "stats":  notch.openExpanded(showing: .stats)
+        case "agents": notch.openExpanded(showing: .agents)
+        default: break
+        }
     }
 
     /// Clicking the Dock icon (no visible windows) re-opens the panel.

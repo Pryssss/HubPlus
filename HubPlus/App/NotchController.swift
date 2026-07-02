@@ -76,6 +76,10 @@ final class NotchController {
 
     func toggle() { setExpanded(!ui.expanded, pin: !ui.expanded) }
     func openExpanded() { setExpanded(true, pin: true) }
+    func openExpanded(showing tab: NotchTab) {
+        ui.tab = tab
+        openExpanded()
+    }
 
     // MARK: Hover / tap / drag
 
