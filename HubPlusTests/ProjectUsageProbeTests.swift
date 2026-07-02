@@ -55,12 +55,11 @@ final class ProjectUsageProbeTests: XCTestCase {
         XCTAssertEqual((cwd! as NSString).lastPathComponent, "my-cool-app")
     }
 
-    /// A file not written today cannot contain lines timestamped today in any way
-    /// that matters — skip it by mtime before ever opening it. Uses a *second*,
-    /// freshly-touched file in the same project dir so the pre-existing directory-level
-    /// "touchedToday" filter still lets the project through; the point is the per-file
-    /// mtime check, not the directory one.
-    func testFileWithYesterdayMtimeIsSkippedEvenWithTodayTimestampedLines() throws {
+    /// A file whose mtime predates the 7-day window cannot contain in-window
+    /// lines that matter — it must be skipped before ever being opened.
+    /// (A second fresh file keeps the directory-level filter true; the point
+    /// is the per-file mtime check.)
+    func testFileOlderThanWindowIsSkippedByMtime() throws {
         let tmpRoot = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("probe-\(UUID().uuidString)", isDirectory: true)
         let projectDir = tmpRoot.appendingPathComponent("proj1", isDirectory: true)
@@ -71,19 +70,18 @@ final class ProjectUsageProbeTests: XCTestCase {
         let ts = ISO8601DateFormatter().string(from: now)
         let todayLine = #"{"timestamp":"\#(ts)","message":{"usage":{"input_tokens":10,"output_tokens":5}}}"#
 
-        // Fresh file: mtime is "just now" (write time), keeps the directory-level filter true.
         let freshFile = projectDir.appendingPathComponent("fresh.jsonl")
         try todayLine.write(to: freshFile, atomically: true, encoding: .utf8)
 
-        // Stale file: identical today-timestamped content, but mtime forced to yesterday.
-        let staleFile = projectDir.appendingPathComponent("stale.jsonl")
-        try todayLine.write(to: staleFile, atomically: true, encoding: .utf8)
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now)!
-        try FileManager.default.setAttributes([.modificationDate: yesterday], ofItemAtPath: staleFile.path)
+        // Ancient file: today-timestamped content, but mtime 8 days back — outside the window.
+        let ancientFile = projectDir.appendingPathComponent("ancient.jsonl")
+        try todayLine.write(to: ancientFile, atomically: true, encoding: .utf8)
+        let eightDaysAgo = Calendar.current.date(byAdding: .day, value: -8, to: now)!
+        try FileManager.default.setAttributes([.modificationDate: eightDaysAgo], ofItemAtPath: ancientFile.path)
 
         let result = ProjectUsageProbe.compute(now: now, root: tmpRoot)
-        XCTAssertEqual(result.projects.first?.tokensToday, 15,
-                        "stale.jsonl's today-timestamped line must not be counted because its mtime is yesterday")
+        XCTAssertEqual(result.projects.first?.tokens?.real, 15,
+                        "ancient.jsonl must be skipped by mtime; only fresh.jsonl counts")
     }
 
     /// Black-box characterization of the incremental/caching behavior: an unchanged
@@ -104,7 +102,7 @@ final class ProjectUsageProbeTests: XCTestCase {
         try (line1 + "\n").write(to: file, atomically: true, encoding: .utf8)
 
         let first = ProjectUsageProbe.compute(now: now, root: tmpRoot)
-        XCTAssertEqual(first.projects.first?.tokensToday, 15)
+        XCTAssertEqual(first.projects.first?.tokens?.real, 15)
 
         let line2 = #"{"timestamp":"\#(ts)","message":{"usage":{"input_tokens":7,"output_tokens":3}}}"#
         let handle = try FileHandle(forWritingTo: file)
@@ -113,7 +111,7 @@ final class ProjectUsageProbeTests: XCTestCase {
         try handle.close()
 
         let second = ProjectUsageProbe.compute(now: now, root: tmpRoot)
-        XCTAssertEqual(second.projects.first?.tokensToday, 25,
+        XCTAssertEqual(second.projects.first?.tokens?.real, 25,
                         "appending a 7+3=10 token line should raise the total from 15 to 25")
     }
 
@@ -135,7 +133,7 @@ final class ProjectUsageProbeTests: XCTestCase {
         try (line + "\n").write(to: file, atomically: true, encoding: .utf8)
 
         let result = ProjectUsageProbe.compute(now: now, root: tmpRoot, chunkSize: 64)
-        XCTAssertEqual(result.projects.first?.tokensToday, 50,
+        XCTAssertEqual(result.projects.first?.tokens?.real, 50,
                         "a line split across chunk boundaries must still be reassembled and parsed correctly")
     }
 
@@ -193,13 +191,13 @@ final class ProjectUsageProbeTests: XCTestCase {
             .write(to: fileB, atomically: true, encoding: .utf8)
 
         let first = ProjectUsageProbe.compute(now: now, root: tmpRoot)
-        XCTAssertEqual(first.projects.first?.tokensToday, 25)
+        XCTAssertEqual(first.projects.first?.tokens?.real, 25)
         XCTAssertTrue(ProjectUsageProbe._hasCacheEntryForTesting(path: fileA.path))
 
         try FileManager.default.removeItem(at: fileA)
 
         let second = ProjectUsageProbe.compute(now: now, root: tmpRoot)
-        XCTAssertEqual(second.projects.first?.tokensToday, 10,
+        XCTAssertEqual(second.projects.first?.tokens?.real, 10,
                         "a deleted file's tokens must be gone from the total")
         XCTAssertFalse(ProjectUsageProbe._hasCacheEntryForTesting(path: fileA.path),
                         "the deleted file's cache entry must be pruned once its directory was scanned")
@@ -235,7 +233,7 @@ final class ProjectUsageProbeTests: XCTestCase {
         try (line1 + "\n").write(to: file, atomically: true, encoding: .utf8)
 
         let first = ProjectUsageProbe.compute(now: now, root: tmpRoot)
-        XCTAssertEqual(first.projects.first?.tokensToday, 15)
+        XCTAssertEqual(first.projects.first?.tokens?.real, 15)
 
         // Append (changes size/mtime, so the cache can no longer take the "unchanged
         // file, no read at all" fast path) then revoke read permission so the resulting
@@ -254,7 +252,7 @@ final class ProjectUsageProbeTests: XCTestCase {
         }
 
         let second = ProjectUsageProbe.compute(now: now, root: tmpRoot)
-        XCTAssertEqual(second.projects.first?.tokensToday, 15,
+        XCTAssertEqual(second.projects.first?.tokens?.real, 15,
                         "an unreadable file must fall back to its last cached total (15), not drop to 0")
     }
 
@@ -286,12 +284,68 @@ final class ProjectUsageProbeTests: XCTestCase {
             bytesConsumed: Int64((line1 + "\n").utf8.count), boundaryTokens: 999)
 
         let result = ProjectUsageProbe.compute(now: now, root: tmpRoot)
-        XCTAssertEqual(result.projects.first?.tokensToday, 1009,
+        XCTAssertEqual(result.projects.first?.tokens?.real, 1009,
                         "an interrupted scan must resume from bytesConsumed with the stored base, not restart at 0")
         XCTAssertFalse(result.partial, "the resumed scan completed within budget, so the tick is not partial")
 
         // The entry is now complete: a further compute() must reuse it verbatim.
         let again = ProjectUsageProbe.compute(now: now, root: tmpRoot)
-        XCTAssertEqual(again.projects.first?.tokensToday, 1009)
+        XCTAssertEqual(again.projects.first?.tokens?.real, 1009)
+    }
+
+    /// One file holding lines from three different days: today, two days ago, and
+    /// eight days ago. The daily series must bucket the first two by local day,
+    /// split real vs cache, zero-fill the rest, and drop the out-of-window line.
+    func testDailyBucketsSplitRealAndCacheAcrossDays() throws {
+        let tmpRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("probe-\(UUID().uuidString)", isDirectory: true)
+        let projectDir = tmpRoot.appendingPathComponent("proj1", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpRoot) }
+
+        let now = Date()
+        let cal = Calendar.current
+        let iso = ISO8601DateFormatter()
+        let tToday = iso.string(from: now)
+        let tTwoDays = iso.string(from: cal.date(byAdding: .day, value: -2, to: now)!)
+        let tEightDays = iso.string(from: cal.date(byAdding: .day, value: -8, to: now)!)
+        let lines = [
+            #"{"timestamp":"\#(tToday)","message":{"usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":100,"cache_read_input_tokens":200}}}"#,
+            #"{"timestamp":"\#(tTwoDays)","message":{"usage":{"input_tokens":7,"output_tokens":3}}}"#,
+            #"{"timestamp":"\#(tEightDays)","message":{"usage":{"input_tokens":999,"output_tokens":999}}}"#,
+        ].joined(separator: "\n") + "\n"
+        try lines.write(to: projectDir.appendingPathComponent("session.jsonl"),
+                        atomically: true, encoding: .utf8)
+
+        let result = ProjectUsageProbe.compute(now: now, root: tmpRoot)
+
+        XCTAssertEqual(result.daily.count, 7)
+        XCTAssertEqual(result.daily.last?.tokens, TokenCount(real: 15, cache: 300), "today: real 10+5, cache 100+200")
+        let dayMinus2 = result.daily[result.daily.count - 3]
+        XCTAssertEqual(dayMinus2.tokens, TokenCount(real: 10, cache: 0), "two days ago: real 7+3")
+        XCTAssertEqual(result.daily.filter { $0.tokens == TokenCount() }.count, 5, "other five days zero-filled")
+        XCTAssertEqual(result.projects.first?.tokens, TokenCount(real: 15, cache: 300),
+                        "the project list is today-only")
+    }
+
+    /// A project whose only in-window activity is on PAST days feeds the daily
+    /// series but must not appear in the today-only project list.
+    func testPastOnlyProjectFeedsDailyButIsOmittedFromProjects() throws {
+        let tmpRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("probe-\(UUID().uuidString)", isDirectory: true)
+        let projectDir = tmpRoot.appendingPathComponent("proj1", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpRoot) }
+
+        let now = Date()
+        let tThreeDays = ISO8601DateFormatter().string(from: Calendar.current.date(byAdding: .day, value: -3, to: now)!)
+        let line = #"{"timestamp":"\#(tThreeDays)","message":{"usage":{"input_tokens":6,"output_tokens":4}}}"#
+        try (line + "\n").write(to: projectDir.appendingPathComponent("session.jsonl"),
+                                atomically: true, encoding: .utf8)
+
+        let result = ProjectUsageProbe.compute(now: now, root: tmpRoot)
+        XCTAssertTrue(result.projects.isEmpty, "no today-tokens → no project row")
+        let dayMinus3 = result.daily[result.daily.count - 4]
+        XCTAssertEqual(dayMinus3.tokens, TokenCount(real: 10, cache: 0))
     }
 }

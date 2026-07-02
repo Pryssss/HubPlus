@@ -12,7 +12,7 @@ final class AppStore: ObservableObject {
     @Published private(set) var burn7d: BurnProjection?
     @Published private(set) var projectUsage: [ProjectUsage] = []
     @Published private(set) var partialProjects = false
-    @Published private(set) var dailyTokens: [(date: Date, tokens: Int)] = []
+    @Published private(set) var dailyTokens: [(date: Date, tokens: TokenCount)] = []
     let history: UsageHistoryStore
     private var lastStats = Date.distantPast
 
@@ -158,7 +158,7 @@ final class AppStore: ObservableObject {
 
     func refresh() {
         // Snapshot the providers on the main actor before hopping to the background queue;
-        // GitProbe/StatsCache stay direct (host-machine concerns, not per-provider).
+        // GitProbe stays direct (a host-machine concern, not per-provider).
         let agents = self.agents
         work.async { [weak self] in
             guard self != nil else { return }
@@ -171,12 +171,13 @@ final class AppStore: ObservableObject {
                                       providerID: provider.id)
                 }
             }
-            let today = StatsCache.tokensToday()
             DispatchQueue.main.async {
                 self?.applyRows(rows)
-                self?.tokensToday = today
             }
         }
+        // Keep stats warm while the panel is up: the 30 s self-throttle inside
+        // refreshStats turns this 3 s tick into a cheap no-op most of the time.
+        refreshStats()
     }
 
     private func applyRows(_ newRows: [SessionRow]) {
@@ -197,12 +198,15 @@ final class AppStore: ObservableObject {
         if !force, Date().timeIntervalSince(lastStats) < 30 { return }
         lastStats = Date()
         statsQueue.async { [weak self] in
-            let daily = StatsCache.dailyTokens(days: 7)
-            let (projects, partial) = ProjectUsageProbe.compute(now: Date())
+            let result = ProjectUsageProbe.compute(now: Date())
             DispatchQueue.main.async {
-                self?.dailyTokens = daily
-                self?.projectUsage = projects
-                self?.partialProjects = partial
+                guard let self else { return }
+                self.dailyTokens = result.daily
+                self.projectUsage = result.projects
+                self.partialProjects = result.partial
+                // Header counter only from a complete pass: a partial sum undercounts,
+                // and flashing a lowball "today" number is worse than keeping the last one.
+                if !result.partial { self.tokensToday = result.daily.last?.tokens.real }
             }
         }
     }

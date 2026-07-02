@@ -7,7 +7,6 @@ enum ClaudePaths {
     }
     static var sessionsDir: URL { home.appendingPathComponent("sessions") }
     static var projectsDir: URL { home.appendingPathComponent("projects") }
-    static var statsCache: URL { home.appendingPathComponent("stats-cache.json") }
 
     /// Claude Code names a project's transcript folder by replacing every
     /// non-alphanumeric character of the absolute cwd with "-".

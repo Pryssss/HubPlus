@@ -9,10 +9,10 @@ struct StatsView: View {
             Divider().opacity(0.2)
             Text("Tokens / day").font(.system(size: 10)).foregroundColor(.secondary)
             HStack(alignment: .bottom, spacing: 3) {
-                let maxT = max(store.dailyTokens.map { $0.tokens }.max() ?? 1, 1)
+                let maxT = max(store.dailyTokens.map { $0.tokens.real }.max() ?? 1, 1)
                 ForEach(Array(store.dailyTokens.enumerated()), id: \.offset) { _, d in
                     Capsule().fill(Color.orange.opacity(0.8))
-                        .frame(width: 10, height: max(2, 34 * CGFloat(d.tokens) / CGFloat(maxT)))
+                        .frame(width: 10, height: max(2, 34 * CGFloat(d.tokens.real) / CGFloat(maxT)))
                 }
             }.frame(height: 36)
             Divider().opacity(0.2)
@@ -21,7 +21,7 @@ struct StatsView: View {
                 HStack {
                     Text(p.name).font(.system(size: 11)).foregroundColor(.white).lineLimit(1)
                     Spacer()
-                    Text(p.tokensToday.map(tokenLabel) ?? "\(p.sessionCount) sess")
+                    Text(p.tokens.map { tokenLabel($0.real) } ?? "\(p.sessionCount) sess")
                         .font(.system(size: 11)).foregroundColor(.secondary)
                 }
             }
