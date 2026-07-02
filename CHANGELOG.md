@@ -14,17 +14,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   keeps the output pipe open past the kill can no longer block the caller forever either.
 - Expanded panel clipping when new sessions appear — the panel now self-sizes to its
   SwiftUI content instead of using hand-computed heights.
+- "Tokens / day" was permanently flat: it read `~/.claude/stats-cache.json`, which is
+  both stale (months old on real machines) and shaped differently than the parser
+  expected (`dailyModelTokens` is now an array). Daily tokens now come from the same
+  bounded transcript scan as the per-project stats, so the chart reflects reality.
+- The header "⚡ today" counter never appeared (same broken source); it now shows real
+  tokens from the transcript scan once a complete pass finishes.
 
 ### Changed
 - Daily usage scan is now bounded/incremental and runs off the session-refresh queue
   instead of blocking it.
 - `AppStore` now talks to Claude-specific data through an `AgentProvider`/`UsageProvider`
   seam, paving the way for non-Claude providers.
+- Token numbers are now humanized everywhere ("1.2M", not "604137k") and mean real
+  input+output tokens rather than cache-inflated totals (cache stays in tooltips).
+- Limit sparklines fill the panel width with a dotted 100% guide, gradient fill, and a
+  current "% used" readout.
 
 ### Added
 - Parser test coverage for transcript reading and the usage endpoint.
 - GitHub Actions CI (macOS test job + Windows build job), single-source app versioning
   via `project.yml`, and a scripted dmg release (`scripts/make-dmg.sh`).
+- Stats tab: summary chips (today / 7 days / top project), per-day token bars for the
+  last 7 days, and proportional per-project share bars — all derived from local
+  transcripts with a real (input+output) vs cache token split.
+- Agents tab: sessions sort by urgency (waiting → error → busy → idle), status capsules
+  show how long the state has lasted ("BUSY · 12m"), and branches show git ahead/behind
+  (↑2 ↓1).
+- `HUBPLUS_OPEN=stats|agents` env var force-expands the panel on launch (dev/testing
+  affordance for screenshots and UI verification).
 
 ## [0.1.0] - 2026-07-02
 
