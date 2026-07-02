@@ -50,7 +50,7 @@ treated as untrusted and rendered inert.
 ## Build
 
 ### macOS
-Requires Xcode and [XcodeGen](https://github.com/yonifc/XcodeGen).
+Requires Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 ```sh
 xcodegen generate
 xcodebuild -scheme HubPlus -configuration Release build
@@ -58,6 +58,8 @@ xcodebuild -scheme HubPlus -configuration Release build
 ```
 Not sandboxed by design (it reads `~/.claude`, the keychain, and runs `git`), so it
 **cannot ship on the Mac App Store** — install the built `HubPlus.app` directly.
+
+To build a distributable `.dmg`, run `scripts/make-dmg.sh` (outputs to `dist/`).
 
 ### Windows
 Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download) and `git` on PATH.

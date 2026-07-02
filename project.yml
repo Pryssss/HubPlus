@@ -11,6 +11,8 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: "-"
     ENABLE_HARDENED_RUNTIME: YES
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
 targets:
   HubPlus:
     type: application
@@ -21,6 +23,8 @@ targets:
       path: HubPlus/Resources/Info.plist
       properties:
         CFBundleDisplayName: Hub+
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # Regular app: shows a Dock icon so it's clearly "running" and re-openable.
         LSUIElement: false
         LSApplicationCategoryType: public.app-category.developer-tools
@@ -60,3 +64,4 @@ schemes:
         HubPlus: all
     test:
       targets: [HubPlusTests]
+      gatherCoverageData: true
