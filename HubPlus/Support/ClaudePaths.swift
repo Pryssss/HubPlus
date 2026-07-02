@@ -21,8 +21,10 @@ enum ClaudePaths {
         return String(out)
     }
 
-    static func transcriptURL(cwd: String, sessionId: String) -> URL {
-        projectsDir
+    /// `root` defaults to `projectsDir` so every existing call site is unchanged;
+    /// tests pass a fixture directory laid out the same way.
+    static func transcriptURL(cwd: String, sessionId: String, root: URL = projectsDir) -> URL {
+        root
             .appendingPathComponent(encodedProjectDirName(forCwd: cwd))
             .appendingPathComponent("\(sessionId).jsonl")
     }

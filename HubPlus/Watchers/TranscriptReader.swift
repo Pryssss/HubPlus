@@ -4,8 +4,11 @@ import Foundation
 /// message, the model, and the context-token count. Best-effort; never throws.
 /// All extracted text is treated as untrusted and sanitized before display.
 enum TranscriptReader {
-    static func snapshot(cwd: String, sessionId: String) -> TranscriptSnapshot? {
-        let url = ClaudePaths.transcriptURL(cwd: cwd, sessionId: sessionId)
+    /// `root` defaults to the real `~/.claude/projects` dir; tests override it to point
+    /// at a fixture directory laid out the same way (`<root>/<encodedProjectDirName>/<sessionId>.jsonl`)
+    /// without touching any other call site's behavior.
+    static func snapshot(cwd: String, sessionId: String, root: URL = ClaudePaths.projectsDir) -> TranscriptSnapshot? {
+        let url = ClaudePaths.transcriptURL(cwd: cwd, sessionId: sessionId, root: root)
         guard let data = tailData(of: url, maxBytes: 256 * 1024),
               let text = String(data: data, encoding: .utf8)
         else { return nil }

@@ -26,28 +26,37 @@ enum UsageClient {
 
         do {
             let (data, resp) = try await URLSession.shared.data(for: req)
-            if let http = resp as? HTTPURLResponse {
-                if http.statusCode == 401 || http.statusCode == 403 { return .authError }
-                if !(200..<300).contains(http.statusCode) {
-                    NSLog("HubPlus: usage HTTP \(http.statusCode)")
-                    return .transient
-                }
-            }
-            guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                NSLog("HubPlus: usage body was not a JSON object")
-                return .transient
-            }
-            let five = window(obj["five_hour"])
-            let seven = window(obj["seven_day"])
-            guard five != nil || seven != nil else {
-                NSLog("HubPlus: usage response missing five_hour/seven_day")
-                return .transient
-            }
-            return .ok(UsageSnapshot(fiveHour: five, sevenDay: seven, state: .ok))
+            // Non-HTTP responses (not expected in practice) fall through to 200 so the
+            // status-code gate is a no-op and parsing proceeds — the same behavior the
+            // original `resp as? HTTPURLResponse` optional-bind produced.
+            let statusCode = (resp as? HTTPURLResponse)?.statusCode ?? 200
+            return parse(statusCode: statusCode, data: data)
         } catch {
             NSLog("HubPlus: usage fetch error \(error.localizedDescription)")
             return .transient
         }
+    }
+
+    /// Pure response-handling seam, split out of `fetch()` so fixture tests can drive
+    /// every status-code/JSON-shape branch without a live network call. No behavior
+    /// change from the inline logic it replaces.
+    static func parse(statusCode: Int, data: Data) -> UsageResult {
+        if statusCode == 401 || statusCode == 403 { return .authError }
+        if !(200..<300).contains(statusCode) {
+            NSLog("HubPlus: usage HTTP \(statusCode)")
+            return .transient
+        }
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            NSLog("HubPlus: usage body was not a JSON object")
+            return .transient
+        }
+        let five = window(obj["five_hour"])
+        let seven = window(obj["seven_day"])
+        guard five != nil || seven != nil else {
+            NSLog("HubPlus: usage response missing five_hour/seven_day")
+            return .transient
+        }
+        return .ok(UsageSnapshot(fiveHour: five, sevenDay: seven, state: .ok))
     }
 
     private static func window(_ any: Any?) -> UsageWindow? {
