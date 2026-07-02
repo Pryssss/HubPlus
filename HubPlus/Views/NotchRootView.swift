@@ -1,14 +1,36 @@
 import SwiftUI
 
+/// Reports the expanded content's natural height so the panel can size itself
+/// instead of the controller re-deriving the layout with hand-tuned constants.
+struct ExpandedContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 /// Expanded state: header · tab switcher · content. Background/shape come from the
 /// container, so this just lays out content and fills the width.
 struct NotchRootView: View {
     @ObservedObject var store: AppStore
     @ObservedObject var ui: NotchUIModel
+    /// The panel's fixed expanded width; the height follows the content.
+    var expandedWidth: CGFloat = 560
     var onClose: () -> Void = {}
     var onJump: (SessionRow) -> Void = { _ in }
+    /// Called with the content's natural height at `expandedWidth` whenever it changes.
+    var onHeightChange: (CGFloat) -> Void = { _ in }
 
     var body: some View {
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(heightProbe)
+            .onPreferenceChange(ExpandedContentHeightKey.self) { onHeightChange($0) }
+    }
+
+    /// The laid-out expanded content. Rendered visibly (filling the panel width) and
+    /// again inside `heightProbe` (pinned to `expandedWidth`) purely to measure height.
+    @ViewBuilder private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             divider
@@ -18,7 +40,19 @@ struct NotchRootView: View {
             tabContent
         }
         .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A hidden copy laid out at the true expanded width, so the reported height
+    /// matches the settled panel rather than the narrower width mid expand-animation.
+    private var heightProbe: some View {
+        content
+            .frame(width: expandedWidth, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(GeometryReader { proxy in
+                Color.clear.preference(key: ExpandedContentHeightKey.self, value: proxy.size.height)
+            })
+            .hidden()
+            .allowsHitTesting(false)
     }
 
     private var header: some View {

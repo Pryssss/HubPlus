@@ -33,13 +33,17 @@ final class NotchController {
     private var collapseWork: DispatchWorkItem?
     private var clickMonitor: Any?
     private var tabCancellable: AnyCancellable?
-    private var projectsCancellable: AnyCancellable?
 
     private var isVerticalEdge: Bool { edge == .left || edge == .right }
     private var collapsedSize: NSSize {
         isVerticalEdge ? NSSize(width: 34, height: 132) : NSSize(width: 210, height: 30)
     }
     private let expandedWidth: CGFloat = 560
+    /// The expanded content's natural height, reported by SwiftUI (source of truth).
+    private var expandedContentHeight: CGFloat?
+    /// Placeholder height used only for the first expand before SwiftUI reports;
+    /// the reported height retargets the in-flight animation within a frame.
+    private let fallbackExpandedHeight: CGFloat = 200
 
     init(store: AppStore) {
         self.store = store
@@ -49,20 +53,12 @@ final class NotchController {
         }
         if let e = d.string(forKey: "pillEdge"), let parsed = Edge(rawValue: e) { edge = parsed }
         ui.vertical = isVerticalEdge
+        // Switching to Stats kicks off a refresh; the panel re-fits itself via the
+        // SwiftUI height report (see updateExpandedHeight), so no manual resize here.
         tabCancellable = ui.$tab.sink { [weak self] tab in
             MainActor.assumeIsolated {
-                guard let self else { return }
-                if tab == .stats { self.store.refreshStats(force: true) }
-                // Defer the resize so `ui.tab` has committed (the @Published sink
-                // fires in willSet); both tabs then size to their own content.
-                DispatchQueue.main.async { if self.ui.expanded { self.applyFrame(animated: true) } }
-            }
-        }
-        // The per-project scan is async; re-fit the Stats panel once results land.
-        projectsCancellable = store.$projectUsage.sink { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.ui.tab == .stats, self.ui.expanded else { return }
-                DispatchQueue.main.async { self.applyFrame(animated: true) }
+                guard let self, tab == .stats else { return }
+                self.store.refreshStats(force: true)
             }
         }
     }
@@ -157,22 +153,14 @@ final class NotchController {
         return screen.frame.maxY - inset - collapsedSize.height / 2
     }
 
-    private func expandedHeight() -> CGFloat {
-        let chrome: CGFloat = 20 + 34 + 68 + 40   // padding + header + usage + tab switcher
-        let h: CGFloat
-        switch ui.tab {
-        case .agents:
-            h = chrome + CGFloat(max(store.rows.count, 1)) * 52
-        case .stats:
-            // Size to actual content — two spark rows + daily-token bars + one row per
-            // project (up to 6) — so an idle/early Stats tab isn't mostly empty.
-            let projects = CGFloat(min(store.projectUsage.count, 6))
-            let partial: CGFloat = store.partialProjects ? 20 : 0
-            let statsBody: CGFloat = 176 + projects * 24 + partial
-            h = chrome + statsBody
-        }
-        let maxH = (notchScreen()?.frame.height ?? 800) - 80
-        return min(h, maxH)
+    /// SwiftUI reports the expanded content's natural height at `expandedWidth`.
+    /// This drives every re-fit the old deferred `applyFrame` hacks used to cover —
+    /// tab switch, async project load, row-count change while pinned open.
+    private func updateExpandedHeight(_ height: CGFloat) {
+        let h = height.rounded(.up)
+        guard h > 0, h != expandedContentHeight else { return }
+        expandedContentHeight = h
+        if ui.expanded { applyFrame(animated: true) }
     }
 
     private func horizontalOriginX(width w: CGFloat, vf: NSRect) -> CGFloat {
@@ -185,9 +173,15 @@ final class NotchController {
     private func applyFrame(animated: Bool) {
         guard let panel, let screen = notchScreen() else { return }
         let vf = screen.frame
-        let size = ui.expanded
-            ? NSSize(width: expandedWidth, height: expandedHeight())
-            : collapsedSize
+        let size: NSSize
+        if ui.expanded {
+            // Clamp to the screen so tall content never grows off-screen.
+            let maxH = vf.height - 80
+            let contentH = expandedContentHeight ?? fallbackExpandedHeight
+            size = NSSize(width: expandedWidth, height: min(contentH, maxH))
+        } else {
+            size = collapsedSize
+        }
         let cW = collapsedSize.width, cH = collapsedSize.height
         let pillLeft = pillCenter.x - cW / 2
         let pillRight = pillCenter.x + cW / 2
@@ -273,10 +267,12 @@ final class NotchController {
     private func makePanel() {
         let container = NotchContainerView(
             store: store, ui: ui,
+            expandedWidth: expandedWidth,
             onDragChanged: { [weak self] in self?.dragChanged() },
             onDragEnded: { [weak self] in self?.dragEnded() },
             onHover: { [weak self] inside in self?.hover(inside) },
             onClose: { [weak self] in self?.close() },
+            onExpandedHeight: { [weak self] h in self?.updateExpandedHeight(h) },
             onJump: { row in WindowJumper.jump(pid: Int32(row.info.pid)) }
         )
         let hosting = NSHostingController(rootView: container)

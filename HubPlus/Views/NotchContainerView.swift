@@ -5,10 +5,12 @@ import SwiftUI
 struct NotchContainerView: View {
     @ObservedObject var store: AppStore
     @ObservedObject var ui: NotchUIModel
+    var expandedWidth: CGFloat = 560
     var onDragChanged: () -> Void
     var onDragEnded: () -> Void
     var onHover: (Bool) -> Void
     var onClose: () -> Void
+    var onExpandedHeight: (CGFloat) -> Void = { _ in }
     var onJump: (SessionRow) -> Void = { _ in }
 
     private var radius: CGFloat { ui.expanded ? 18 : 15 }
@@ -18,7 +20,8 @@ struct NotchContainerView: View {
         ZStack {
             shape.fill(Color.black)
             if ui.expanded {
-                NotchRootView(store: store, ui: ui, onClose: onClose, onJump: onJump)
+                NotchRootView(store: store, ui: ui, expandedWidth: expandedWidth,
+                              onClose: onClose, onJump: onJump, onHeightChange: onExpandedHeight)
                     .gesture(
                         DragGesture(minimumDistance: 6)
                             .onChanged { _ in onDragChanged() }
