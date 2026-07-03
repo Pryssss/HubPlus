@@ -4,7 +4,10 @@ import Carbon.HIToolbox
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let store = AppStore()
+    // HUBPLUS_DEMO=1 swaps every data source for mock fixtures (screenshots/demos).
+    private let store = ProcessInfo.processInfo.environment["HUBPLUS_DEMO"] == "1"
+        ? AppStore.demo()
+        : AppStore()
     private var notch: NotchController?
     private var statusItem: NSStatusItem?
     private var contextMenu: NSMenu?

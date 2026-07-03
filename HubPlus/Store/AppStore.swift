@@ -16,18 +16,29 @@ final class AppStore: ObservableObject {
     let history: UsageHistoryStore
     private var lastStats = Date.distantPast
 
+    typealias StatsResult = (projects: [ProjectUsage],
+                             daily: [(date: Date, tokens: TokenCount)],
+                             partial: Bool)
+
     // Injectable seams. Defaults reproduce today's behavior exactly (single Claude
-    // provider, OAuth usage). Tests inject fakes + a temp-file history store so
-    // constructing AppStore never touches ~/.claude or real Application Support.
+    // provider, OAuth usage, direct git/stats probes). Tests and HUBPLUS_DEMO inject
+    // fakes + a temp-file history store so constructing AppStore never touches
+    // ~/.claude or real Application Support.
     private let agents: [any AgentProvider]
     private let usageProvider: any UsageProvider
+    private let gitProbe: @Sendable (String) -> GitInfo?
+    private let statsCompute: @Sendable (Date) -> StatsResult
 
     init(agents: [any AgentProvider] = [ClaudeAgentProvider()],
          usage: any UsageProvider = ClaudeOAuthUsageProvider(),
-         history: UsageHistoryStore = UsageHistoryStore(fileURL: UsageHistoryStore.defaultURL())) {
+         history: UsageHistoryStore = UsageHistoryStore(fileURL: UsageHistoryStore.defaultURL()),
+         gitProbe: @escaping @Sendable (String) -> GitInfo? = { GitProbe.probe(cwd: $0) },
+         stats: @escaping @Sendable (Date) -> StatsResult = { ProjectUsageProbe.compute(now: $0) }) {
         self.agents = agents
         self.usageProvider = usage
         self.history = history
+        self.gitProbe = gitProbe
+        self.statsCompute = stats
     }
 
     private var timer: Timer?
@@ -158,8 +169,9 @@ final class AppStore: ObservableObject {
 
     func refresh() {
         // Snapshot the providers on the main actor before hopping to the background queue;
-        // GitProbe stays direct (a host-machine concern, not per-provider).
+        // git stays a host-machine seam (not per-provider), injectable for demo/tests.
         let agents = self.agents
+        let gitProbe = self.gitProbe
         work.async { [weak self] in
             guard self != nil else { return }
             let rows = agents.flatMap { provider -> [SessionRow] in
@@ -167,7 +179,7 @@ final class AppStore: ObservableObject {
                     let transcript = provider.transcriptSnapshot(cwd: s.cwd, sessionId: s.sessionId)
                     let effectiveCwd = transcript?.cwd ?? s.cwd
                     return SessionRow(info: s, transcript: transcript,
-                                      git: GitProbe.probe(cwd: effectiveCwd),
+                                      git: gitProbe(effectiveCwd),
                                       providerID: provider.id)
                 }
             }
@@ -197,8 +209,9 @@ final class AppStore: ObservableObject {
     func refreshStats(force: Bool = false) {
         if !force, Date().timeIntervalSince(lastStats) < 30 { return }
         lastStats = Date()
+        let statsCompute = self.statsCompute
         statsQueue.async { [weak self] in
-            let result = ProjectUsageProbe.compute(now: Date())
+            let result = statsCompute(Date())
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.dailyTokens = result.daily

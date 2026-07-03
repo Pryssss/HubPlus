@@ -43,6 +43,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (↑2 ↓1).
 - `HUBPLUS_OPEN=stats|agents` env var force-expands the panel on launch (dev/testing
   affordance for screenshots and UI verification).
+- `HUBPLUS_DEMO=1` env var runs the app entirely on mock fixtures (fake sessions, git
+  state, usage windows, seeded 48h history, coherent stats) — no ~/.claude, Keychain,
+  or network access; repo screenshots are captured in this mode so they leak nothing
+  real. Composable with `HUBPLUS_OPEN`.
 
 ## [0.1.0] - 2026-07-02
 
