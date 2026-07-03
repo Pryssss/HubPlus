@@ -8,14 +8,23 @@ subscription usage — on **macOS** (a Dynamic-Island-style panel in the notch) 
 
 ![Hub+ expanded panel](docs/screenshots/expanded.png)
 
-**→ [Visual guide: how to use it](docs/USAGE.md)** · collapsed pill, expanded panel, and edge-docking.
+**→ [Visual guide: how to use it](docs/USAGE.md)** · collapsed pill, expanded panel, Stats tab, and edge-docking.
 
 ## Features
 
-- **Live session monitor** — every running Claude Code session at a glance: status
-  (idle / busy / waiting), model, context-window %, git repo + branch, and the last
-  message.
-- **Subscription usage** — the 5h and 7d limit windows with % left and reset times.
+- **Live session monitor (Agents tab)** — every running Claude Code session at a
+  glance: status (idle / busy / waiting), model, context-window %, git repo + branch
+  with ahead/behind (`↑2 ↓1`), and the last message. Sessions sort by urgency
+  (waiting → error → busy → idle) and the status capsule shows how long the state
+  has lasted (`BUSY · 12m`).
+- **Subscription usage** — the 5h and 7d limit windows with % left, reset times, and
+  a burn-rate (time-to-limit) projection.
+- **Stats tab** — summary chips (today / 7 days / top project), a 48h history of both
+  limit windows, per-day token bars for the last 7 days, and proportional per-project
+  share bars — all derived from your local transcripts, counting real (input+output)
+  tokens with the cache-inflated totals kept to tooltips.
+
+  ![Stats tab](docs/screenshots/stats.png)
 - **macOS** — a notch "island": a collapsed pill that expands on hover/click, drags
   to any screen edge (snaps + reorients), a `⌃⌥H` global hotkey, and native
   notifications (agent finished / needs you / limit reached).
@@ -71,7 +80,8 @@ dotnet build -c Release
 
 ## Status & roadmap
 
-- **macOS** — working: monitor, usage, notch island, drag-to-edge, hotkey, notifications.
+- **macOS** — working: monitor, usage, Stats tab, notch island, drag-to-edge, hotkey,
+  notifications.
 - **Windows** — v1: tray + floating panel (pill/animation/edge-snap/notifications not yet ported).
 - **Next** — Codex (and other agent) providers; launch + approve agents from the hub;
   fully-local usage-estimate mode.

@@ -22,22 +22,40 @@ Hover it to peek, click it to pin it open.
 
 ---
 
-## 2 · The expanded panel — the full view
+## 2 · The expanded panel — Agents
 
 ![Expanded panel](screenshots/expanded.png)
 
 - **Header** — how many agents are running and tokens used today. **✕** collapses it.
-- **Claude usage** — your **5h** and **7d** limit windows: % left and when each resets.
-- **One card per session**:
-  - the **project** (git repo) name and `⎇ branch`,
-  - a **status** capsule — `IDLE` / `BUSY` / `WAITING`,
+- **Claude usage** — your **5h** and **7d** limit windows: % left, when each resets,
+  and a 🔥 burn-rate estimate of how long until you hit the limit.
+- **Tabs** — switch between **Agents** (session cards) and **Stats** (usage analytics).
+- **One card per session**, sorted by urgency (waiting → error → busy → idle):
+  - the **project** (git repo) name and `⎇ branch`, with git ahead/behind (`↑2 ↓1`),
+  - a **status** capsule with how long the state has lasted — `BUSY · 12m`,
   - the **model**,
   - **context %** — how full that model's context window is (reddens near 100%),
-  - how long ago it last did something, and its **last message**.
+  - how long ago it last did something, and its **last message**,
+  - **↗** jumps to that agent's terminal window.
 
 ---
 
-## 3 · Dock it to any edge
+## 3 · The Stats tab — where your tokens go
+
+![Stats tab](screenshots/stats.png)
+
+All derived from your local transcripts — token counts are **real** input+output
+tokens (cache-inflated totals live in tooltips):
+
+- **Summary chips** — tokens today, last 7 days, and your top project.
+- **Limits · 48h** — how both limit windows moved over the last two days, with the
+  current "% used" readout.
+- **Tokens · 7 days** — a bar per day for the last week.
+- **By project · today** — proportional share bars with per-project session counts.
+
+---
+
+## 4 · Dock it to any edge
 
 ![Vertical pill on a side edge](screenshots/vertical.png)
 
